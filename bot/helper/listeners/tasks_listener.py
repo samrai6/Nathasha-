@@ -454,7 +454,7 @@ class MirrorLeechListener:
                 with open(srt_path, "w", encoding="utf-8") as subtitle_file:
                     subtitle_file.write(
                         "1\n00:00:00,000 --> "
-                        + f"00:00:{intro_duration:02d},000\n"
+                        + f"00:{intro_duration // 60:02d}:{intro_duration % 60:02d},000\n"
                         + f'<font color="{color_map[intro_color]}">{safe_text}</font>\n'
                     )
 
