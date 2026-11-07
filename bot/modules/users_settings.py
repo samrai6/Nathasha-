@@ -125,6 +125,10 @@ desp_dict = {
         "Your Channel Name that will be used while editing metadata of the Video File",
         "Send Metadata Text for Leeching Files.\n<b>Timeout:</b> 60 Sec.",
     ],
+    "subintro_text": [
+        "Text shown at the beginning of every leeched video.",
+        "Send your Sub Intro text.\n<b>Timeout:</b> 60 Sec.",
+    ],
 }
 fname_dict = {
     "rcc": "RClone",
@@ -132,6 +136,7 @@ fname_dict = {
     "lsuffix": "Suffix",
     "lremname": "Remname",
     "lmeta": "Metadata",
+    "subintro_text": "Sub Intro Text",
     "mprefix": "Prefix",
     "msuffix": "Suffix",
     "mremname": "Remname",
@@ -443,6 +448,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             f"{'✅️' if lmeta != 'Not Exists' else ''} Metadata",
             f"userset {user_id} lmeta",
         )
+        buttons.ibutton("Sub Intro", f"userset {user_id} subintro")
 
         text = BotTheme(
             "LEECH",
@@ -462,6 +468,55 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         )
 
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
+        buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        button = buttons.build_menu(2)
+    elif key == "subintro":
+        intro_text = user_dict.get("subintro_text", "")
+        intro_enabled = user_dict.get("subintro_enabled", False)
+        intro_duration = user_dict.get("subintro_duration", 10)
+        intro_color = user_dict.get("subintro_color", "white")
+        buttons.ibutton(
+            "Disable Sub Intro" if intro_enabled else "Enable Sub Intro",
+            f"userset {user_id} subintro_toggle",
+            "header",
+        )
+        buttons.ibutton("Set / Change Text", f"userset {user_id} subintro_text")
+        buttons.ibutton("Duration", f"userset {user_id} subintro_duration")
+        buttons.ibutton("Colour", f"userset {user_id} subintro_color")
+        text = (
+            f"➲ <b>Sub Intro:</b> {'Enabled' if intro_enabled else 'Disabled'}\n"
+            f"➲ <b>Text:</b> {escape(intro_text) if intro_text else 'Not Set'}\n"
+            f"➲ <b>Duration:</b> {intro_duration} sec\n"
+            f"➲ <b>Colour:</b> {intro_color.title()}\n\n"
+            "<i>Text appears at the beginning of every leeched video.</i>"
+        )
+        if intro_text:
+            buttons.ibutton("Delete Text", f"userset {user_id} subintro_delete")
+        buttons.ibutton("Back", f"userset {user_id} back leech", "footer")
+        buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        button = buttons.build_menu(2)
+    elif key == "subintro_duration":
+        for duration in (5, 10, 15, 30, 60):
+            buttons.ibutton(f"{duration} sec", f"userset {user_id} subintro_setdur {duration}")
+        text = "Select how long your Sub Intro text should appear (maximum 60 seconds)."
+        buttons.ibutton("Back", f"userset {user_id} subintro", "footer")
+        button = buttons.build_menu(2)
+    elif key == "subintro_color":
+        for color in ("white", "red", "blue", "green"):
+            selected = "✅️ " if user_dict.get("subintro_color", "white") == color else ""
+            buttons.ibutton(f"{selected}{color.title()}", f"userset {user_id} subintro_setcolor {color}")
+        text = "Select the Sub Intro text colour."
+        buttons.ibutton("Back", f"userset {user_id} subintro", "footer")
+        button = buttons.build_menu(2)
+    elif key == "subintro_text":
+        intro_text = user_dict.get("subintro_text", "") or "Not Exists"
+        text = f"➲ <b>Sub Intro Text:</b> {escape(intro_text)}\n\n<b>Description:</b> Send the text to show at the start of every leeched video."
+        if not edit_mode:
+            buttons.ibutton("Change Text", f"userset {user_id} subintro_text edit")
+        else:
+            text += "\n\nSend the new Sub Intro text now. (60 sec timeout)"
+            buttons.ibutton("Stop Change", f"userset {user_id} subintro")
+        buttons.ibutton("Back", f"userset {user_id} subintro", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
         button = buttons.build_menu(2)
     elif key == "ddl_servers":
@@ -711,7 +766,7 @@ async def set_custom(client, message, pre_event, key, direct=False):
     user_id = message.from_user.id
     handler_dict[user_id] = False
     value = message.text
-    return_key = "leech"
+    return_key = "subintro" if key == "subintro_text" else "leech"
     n_key = key
     user_dict = user_data.get(user_id, {})
     if key in ["gofile", "streamtape"]:
@@ -888,6 +943,55 @@ async def edit_user_settings(client, query):
     elif data[2] in ["universal", "mirror", "leech"]:
         await query.answer()
         await update_user_settings(query, data[2])
+    elif data[2] == "subintro":
+        handler_dict[user_id] = False
+        await query.answer()
+        await update_user_settings(query, "subintro", "leech")
+    elif data[2] == "subintro_text":
+        handler_dict[user_id] = False
+        await query.answer()
+        edit_mode = len(data) == 4
+        await update_user_settings(query, "subintro_text", "subintro", edit_mode)
+        if edit_mode:
+            pfunc = partial(set_custom, pre_event=query, key="subintro_text")
+            rfunc = partial(update_user_settings, query, "subintro_text", "subintro")
+            await event_handler(client, query, pfunc, rfunc)
+    elif data[2] in ["subintro_toggle", "subintro_delete"]:
+        handler_dict[user_id] = False
+        if data[2] == "subintro_toggle":
+            update_user_ldata(user_id, "subintro_enabled", not user_dict.get("subintro_enabled", False))
+        else:
+            update_user_ldata(user_id, "subintro_text", "")
+        await query.answer()
+        await update_user_settings(query, "subintro", "leech")
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
+    elif data[2] == "subintro_duration":
+        handler_dict[user_id] = False
+        await query.answer()
+        await update_user_settings(query, "subintro_duration", "subintro")
+    elif data[2] == "subintro_color":
+        handler_dict[user_id] = False
+        await query.answer()
+        await update_user_settings(query, "subintro_color", "subintro")
+    elif data[2] == "subintro_setdur":
+        handler_dict[user_id] = False
+        duration = max(1, min(60, int(data[3])))
+        update_user_ldata(user_id, "subintro_duration", duration)
+        await query.answer(f"Duration set to {duration} sec")
+        await update_user_settings(query, "subintro", "leech")
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
+    elif data[2] == "subintro_setcolor":
+        handler_dict[user_id] = False
+        color = data[3].lower()
+        if color not in ("white", "red", "blue", "green"):
+            return await query.answer("Invalid colour", show_alert=True)
+        update_user_ldata(user_id, "subintro_color", color)
+        await query.answer(f"Colour set to {color.title()}")
+        await update_user_settings(query, "subintro", "leech")
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
     elif data[2] == "doc":
         update_user_ldata(user_id, "as_doc", not user_dict.get("as_doc", False))
         await query.answer()
@@ -1102,6 +1206,13 @@ async def edit_user_settings(client, query):
         pfunc = partial(set_custom, pre_event=query, key=data[2])
         rfunc = partial(update_user_settings, query, data[2], return_key)
         await event_handler(client, query, pfunc, rfunc)
+    elif data[2] == "dsubintro_text":
+        handler_dict[user_id] = False
+        update_user_ldata(user_id, "subintro_text", "")
+        await query.answer()
+        await update_user_settings(query, "subintro", "leech")
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
     elif data[2] in [
         "dlprefix",
         "dlsuffix",
