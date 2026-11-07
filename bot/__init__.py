@@ -430,8 +430,8 @@ EQUAL_SPLITS = EQUAL_SPLITS.lower() == "true"
 MEDIA_GROUP = environ.get("MEDIA_GROUP", "")
 MEDIA_GROUP = MEDIA_GROUP.lower() == "true"
 
-BASE_URL_PORT = environ.get("BASE_URL_PORT", "")
-BASE_URL_PORT = 80 if len(BASE_URL_PORT) == 0 else int(BASE_URL_PORT)
+BASE_URL_PORT = environ.get("PORT", environ.get("BASE_URL_PORT", "8080"))
+BASE_URL_PORT = int(BASE_URL_PORT)
 
 BASE_URL = environ.get("BASE_URL", "").rstrip("/")
 if len(BASE_URL) == 0:
@@ -798,7 +798,7 @@ if ospath.exists("shorteners.txt"):
             if len(temp) == 2:
                 shorteners_list.append({"domain": temp[0], "api_key": temp[1]})
 
-if BASE_URL:
+if BASE_URL or environ.get("PORT"):
     Popen(
         f"gunicorn web.wserver:app --bind 0.0.0.0:{BASE_URL_PORT} --worker-class gevent",
         shell=True,
