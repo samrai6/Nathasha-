@@ -7,7 +7,7 @@ from logging import (
     info as log_info,
 )
 from os import path as ospath, environ, remove
-from subprocess import run as srun, call as scall
+from subprocess import run as srun, call as scall, CalledProcessError
 from importlib.metadata import distributions
 from requests import get as rget
 from dotenv import load_dotenv, dotenv_values
@@ -48,7 +48,7 @@ if len(DATABASE_URL) == 0:
     DATABASE_URL = None
 
 if DATABASE_URL is not None:
-    conn = MongoClient(DATABASE_URL)
+    conn = MongoClient(DATABASE_URL, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000)
     db = conn.wzmlx
     old_config = db.settings.deployConfig.find_one({"_id": bot_id})
     config_dict = db.settings.config.find_one({"_id": bot_id})
@@ -81,24 +81,18 @@ if UPSTREAM_REPO is not None:
     if ospath.exists(".git"):
         srun(["rm", "-rf", ".git"])
 
-    update = srun(
-        [
-            f"git init -q \
-                     && git config --global user.email doc.adhikari@gmail.com \
-                     && git config --global user.name weebzone \
-                     && git add . \
-                     && git commit -sm update -q \
-                     && git remote add origin {UPSTREAM_REPO} \
-                     && git fetch origin -q \
-                     && git reset --hard origin/{UPSTREAM_BRANCH} -q"
-        ],
-        shell=True,
-    )
-
-    repo = UPSTREAM_REPO.split("/")
-    UPSTREAM_REPO = f"https://github.com/{repo[-2]}/{repo[-1]}"
-    if update.returncode == 0:
+    try:
+        # Use argument lists instead of a shell command so repository/branch
+        # values cannot inject arbitrary shell commands.
+        srun(["git", "init", "-q"], check=True)
+        srun(["git", "config", "user.email", "bot@localhost"], check=True)
+        srun(["git", "config", "user.name", "WZML-X updater"], check=True)
+        srun(["git", "add", "."], check=True)
+        srun(["git", "commit", "-sm", "update", "-q"], check=True)
+        srun(["git", "remote", "add", "origin", UPSTREAM_REPO], check=True)
+        srun(["git", "fetch", "origin", UPSTREAM_BRANCH, "-q"], check=True)
+        srun(["git", "reset", "--hard", f"origin/{UPSTREAM_BRANCH}", "-q"], check=True)
         log_info("Successfully updated with latest commits !!")
-    else:
-        log_error("Something went Wrong ! Retry or Ask Support !")
+    except CalledProcessError as error:
+        log_error(f"Upstream update failed (exit code {error.returncode}).")
     log_info(f"UPSTREAM_REPO: {UPSTREAM_REPO} | UPSTREAM_BRANCH: {UPSTREAM_BRANCH}")
