@@ -453,9 +453,9 @@ class MirrorLeechListener:
                 temp_path = f"{ospath.splitext(video_path)[0]}.subintro{ext}"
                 with open(srt_path, "w", encoding="utf-8") as subtitle_file:
                     subtitle_file.write(
-                        "1\\n00:00:00,000 --> "
-                        + f"00:00:{intro_duration:02d},000\\n"
-                        + f'<font color="{color_map[intro_color]}">{safe_text}</font>\\n'
+                        "1\n00:00:00,000 --> "
+                        + f"00:00:{intro_duration:02d},000\n"
+                        + f'<font color="{color_map[intro_color]}">{safe_text}</font>\n'
                     )
 
                 # Count existing subtitle streams so the new intro can be
