@@ -100,7 +100,7 @@ if len(DATABASE_URL) == 0:
     DATABASE_URL = ""
 
 if DATABASE_URL:
-    conn = MongoClient(DATABASE_URL)
+    conn = MongoClient(DATABASE_URL, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000)
     db = conn.wzmlx
     current_config = dict(dotenv_values("config.env"))
     old_config = db.settings.deployConfig.find_one({"_id": bot_id})
@@ -237,7 +237,7 @@ if len(EXCEP_CHATS) == 0:
 
 def wztgClient(*args, **kwargs):
     if "max_concurrent_transmissions" in signature(tgClient.__init__).parameters:
-        kwargs["max_concurrent_transmissions"] = 1000
+        kwargs["max_concurrent_transmissions"] = int(environ.get("MAX_CONCURRENT_TRANSMISSIONS", "4"))
     return tgClient(*args, **kwargs)
 
 
@@ -893,7 +893,7 @@ bot = wztgClient(
     TELEGRAM_API,
     TELEGRAM_HASH,
     bot_token=BOT_TOKEN,
-    workers=1000,
+    workers=16,
     parse_mode=enums.ParseMode.HTML,
 ).start()
 bot_loop = bot.loop
