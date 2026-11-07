@@ -488,7 +488,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             f"➲ <b>Text:</b> {escape(intro_text) if intro_text else 'Not Set'}\n"
             f"➲ <b>Duration:</b> {intro_duration} sec\n"
             f"➲ <b>Colour:</b> {intro_color.title()}\n\n"
-            "<i>Text appears at the beginning of every leeched video.</i>"
+            "<i>Soft subtitle track: visible only when subtitles are enabled in VLC / MX Player. Video is not re-encoded.</i>"
         )
         if intro_text:
             buttons.ibutton("Delete Text", f"userset {user_id} subintro_delete")
