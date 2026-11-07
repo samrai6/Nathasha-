@@ -5,7 +5,7 @@ This repository runs a Telegram mirror/leech bot as a long-running worker.
 ## Create the service
 
 1. In Koyeb, create an App and choose **GitHub** as the deployment source.
-2. Select `samrai6/Nathasha-` and branch **`koyeb-deploy`**.
+2. Select `samrai6/Nathasha-` and branch **`master`**.
 3. Choose the **Dockerfile** builder and deploy it as a **Worker** (not a web service).
 4. Do not add an HTTP port for the bot worker. The bot does not need an inbound web port unless you intentionally configure `BASE_URL`.
 5. Set the required environment variables below, then deploy.
