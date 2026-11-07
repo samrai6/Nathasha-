@@ -28,7 +28,7 @@ This repository runs a Telegram mirror/leech bot as a long-running worker.
 
 ## Important notes
 
-- Keep `UPSTREAM_REPO` empty. Setting it makes `update.py` replace the checked-out source with the selected upstream branch, which can overwrite this repository's changes.
+- Keep `UPSTREAM_REPO` empty. The Koyeb Docker image sets `KOYEB_DEPLOYMENT=true`, which disables upstream source replacement so stale MongoDB settings cannot overwrite this repository at startup.
 - Do not add `_____REMOVE_THIS_LINE_____` as an environment variable. It is a safety guard that deliberately exits the app.
 - Store credentials as Koyeb Secrets/environment variables. Do not commit tokens, API hashes, or MongoDB passwords to GitHub.
 - Koyeb container filesystems may be ephemeral. Do not assume downloaded files survive a redeploy/restart; use supported persistent storage or an external upload destination for files that must persist.
