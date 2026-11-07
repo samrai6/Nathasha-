@@ -406,6 +406,56 @@ class MirrorLeechListener:
                 self.newDir = ""
                 up_path = dl_path
 
+        if self.isLeech and self.user_dict.get("subintro_enabled") and self.user_dict.get("subintro_text"):
+            intro_text = str(self.user_dict["subintro_text"])
+            intro_duration = max(1, min(60, int(self.user_dict.get("subintro_duration", 10))))
+            intro_color = self.user_dict.get("subintro_color", "white").lower()
+            if intro_color not in ("white", "red", "blue", "green"):
+                intro_color = "white"
+            intro_path = up_path or dl_path
+            intro_files = []
+            if await aiopath.isfile(intro_path):
+                if (await get_document_type(intro_path))[0]:
+                    intro_files.append(intro_path)
+            elif await aiopath.isdir(intro_path):
+                for dirpath, _, files in await sync_to_async(walk, intro_path):
+                    for file in files:
+                        video_path = ospath.join(dirpath, file)
+                        if (await get_document_type(video_path))[0]:
+                            intro_files.append(video_path)
+            for video_path in intro_files:
+                if self.suproc == "cancelled":
+                    return
+                temp_path = f"{ospath.splitext(video_path)[0]}.subintro{ospath.splitext(video_path)[1]}"
+                safe_text = (intro_text.replace("\\", "\\\\")
+                             .replace(":", "\\:").replace("'", "\\'")
+                             .replace("%", "\\%").replace(",", "\\,")
+                             .replace("[", "\\[").replace("]", "\\]")
+                             .replace(";", "\\;").replace("\n", " "))
+                drawtext = (
+                    f"drawtext=text='{safe_text}':fontcolor={intro_color}:"
+                    "fontsize=h/18:x=(w-text_w)/2:y=h-(text_h*2):"
+                    "box=1:boxcolor=black@0.45:boxborderw=12:"
+                    f"enable='between(t,0,{intro_duration})'"
+                )
+                cmd = [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", video_path, "-map", "0", "-vf", drawtext,
+                    "-map_metadata", "0", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-crf", "23", "-c:a", "copy", "-c:s", "copy", temp_path,
+                ]
+                process = await create_subprocess_exec(*cmd, stderr=PIPE)
+                code = await process.wait()
+                if code == 0 and await aiopath.exists(temp_path):
+                    await aioremove(video_path)
+                    await move(temp_path, video_path)
+                    LOGGER.info(f"Sub Intro applied: {video_path}")
+                else:
+                    error = (await process.stderr.read()).decode(errors="ignore")
+                    LOGGER.error(f"Sub Intro failed for {video_path}: {error}")
+                    if await aiopath.exists(temp_path):
+                        await aioremove(temp_path)
+
         if metadata := self.user_dict.get("lmeta") or config_dict["METADATA"]:
             meta_path = up_path or dl_path
             self.newDir = f"{self.dir}10000"
