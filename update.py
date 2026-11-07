@@ -70,6 +70,9 @@ if UPGRADE_PACKAGES.lower() == "true":
     scall("uv pip install --system " + " ".join(packages), shell=True)
 
 UPSTREAM_REPO = environ.get("UPSTREAM_REPO", "")
+# On Koyeb, never let a stale MongoDB setting replace the deployed source tree.
+if environ.get("KOYEB_DEPLOYMENT", "").lower() == "true":
+    UPSTREAM_REPO = ""
 if len(UPSTREAM_REPO) == 0:
     UPSTREAM_REPO = None
 
