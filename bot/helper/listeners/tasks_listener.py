@@ -11,6 +11,7 @@ from os import walk, path as ospath
 from html import escape
 from aioshutil import move
 from asyncio import create_subprocess_exec, sleep, Event
+from asyncio.subprocess import PIPE
 from pyrogram.enums import ChatType
 
 from bot import (
@@ -407,11 +408,18 @@ class MirrorLeechListener:
                 up_path = dl_path
 
         if self.isLeech and self.user_dict.get("subintro_enabled") and self.user_dict.get("subintro_text"):
-            intro_text = str(self.user_dict["subintro_text"])
+            intro_text = str(self.user_dict["subintro_text"]).strip()
             intro_duration = max(1, min(60, int(self.user_dict.get("subintro_duration", 10))))
             intro_color = self.user_dict.get("subintro_color", "white").lower()
-            if intro_color not in ("white", "red", "blue", "green"):
+            color_map = {
+                "white": "#FFFFFF",
+                "red": "#FF0000",
+                "blue": "#0000FF",
+                "green": "#00FF00",
+            }
+            if intro_color not in color_map:
                 intro_color = "white"
+
             intro_path = up_path or dl_path
             intro_files = []
             if await aiopath.isfile(intro_path):
@@ -423,36 +431,77 @@ class MirrorLeechListener:
                         video_path = ospath.join(dirpath, file)
                         if (await get_document_type(video_path))[0]:
                             intro_files.append(video_path)
+
             for video_path in intro_files:
                 if self.suproc == "cancelled":
                     return
-                temp_path = f"{ospath.splitext(video_path)[0]}.subintro{ospath.splitext(video_path)[1]}"
-                safe_text = (intro_text.replace("\\", "\\\\")
-                             .replace(":", "\\:").replace("'", "\\'")
-                             .replace("%", "\\%").replace(",", "\\,")
-                             .replace("[", "\\[").replace("]", "\\]")
-                             .replace(";", "\\;").replace("\n", " "))
-                drawtext = (
-                    f"drawtext=text='{safe_text}':fontcolor={intro_color}:"
-                    "fontsize=h/18:x=(w-text_w)/2:y=h-(text_h*2):"
-                    "box=1:boxcolor=black@0.45:boxborderw=12:"
-                    f"enable='between(t,0,{intro_duration})'"
+
+                ext = ospath.splitext(video_path)[1].lower()
+                if ext in (".mkv",):
+                    subtitle_codec = "srt"
+                elif ext in (".mp4", ".m4v", ".mov"):
+                    subtitle_codec = "mov_text"
+                else:
+                    LOGGER.warning(f"Sub Intro skipped (unsupported subtitle container): {video_path}")
+                    continue
+
+                # SRT is an independent subtitle stream: it appears only when
+                # the player has subtitles enabled and never re-encodes video.
+                safe_text = (intro_text.replace("&", "&amp;")
+                             .replace("<", "&lt;").replace(">", "&gt;"))
+                srt_path = f"{ospath.splitext(video_path)[0]}.subintro.srt"
+                temp_path = f"{ospath.splitext(video_path)[0]}.subintro{ext}"
+                with open(srt_path, "w", encoding="utf-8") as subtitle_file:
+                    subtitle_file.write(
+                        "1\\n00:00:00,000 --> "
+                        + f"00:00:{intro_duration:02d},000\\n"
+                        + f'<font color="{color_map[intro_color]}">{safe_text}</font>\\n'
+                    )
+
+                # Count existing subtitle streams so the new intro can be
+                # marked as the default track without deleting other subtitles.
+                probe_cmd = [
+                    "ffprobe", "-v", "error", "-select_streams", "s",
+                    "-show_entries", "stream=index", "-of", "csv=p=0", video_path,
+                ]
+                probe = await create_subprocess_exec(
+                    *probe_cmd, stdout=PIPE, stderr=PIPE
                 )
+                probe_out, probe_err = await probe.communicate()
+                if probe.returncode != 0:
+                    LOGGER.error(
+                        f"Sub Intro probe failed for {video_path}: "
+                        f"{probe_err.decode(errors='ignore')}"
+                    )
+                    await aioremove(srt_path)
+                    continue
+                subtitle_count = len([
+                    line for line in probe_out.decode(errors="ignore").splitlines()
+                    if line.strip()
+                ])
+
                 cmd = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", video_path, "-map", "0", "-vf", drawtext,
-                    "-map_metadata", "0", "-c:v", "libx264", "-preset", "ultrafast",
-                    "-crf", "23", "-c:a", "copy", "-c:s", "copy", temp_path,
+                    "-i", video_path, "-i", srt_path,
+                    "-map", "0", "-map", "1:0",
+                    "-map_metadata", "0", "-c", "copy",
+                    f"-c:s:{subtitle_count}", subtitle_codec,
+                    f"-disposition:s:{subtitle_count}", "default",
+                    f"-metadata:s:s:{subtitle_count}", "title=Sub Intro",
+                    temp_path,
                 ]
                 process = await create_subprocess_exec(*cmd, stderr=PIPE)
-                code = await process.wait()
-                if code == 0 and await aiopath.exists(temp_path):
+                _, error = await process.communicate()
+                await aioremove(srt_path)
+                if process.returncode == 0 and await aiopath.exists(temp_path):
                     await aioremove(video_path)
                     await move(temp_path, video_path)
-                    LOGGER.info(f"Sub Intro applied: {video_path}")
+                    LOGGER.info(f"Soft Sub Intro track added: {video_path}")
                 else:
-                    error = (await process.stderr.read()).decode(errors="ignore")
-                    LOGGER.error(f"Sub Intro failed for {video_path}: {error}")
+                    LOGGER.error(
+                        f"Soft Sub Intro failed for {video_path}: "
+                        f"{error.decode(errors='ignore')}"
+                    )
                     if await aiopath.exists(temp_path):
                         await aioremove(temp_path)
 
