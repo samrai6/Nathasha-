@@ -100,7 +100,7 @@ if len(DATABASE_URL) == 0:
     DATABASE_URL = ""
 
 if DATABASE_URL:
-    conn = MongoClient(DATABASE_URL)
+    conn = MongoClient(DATABASE_URL, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000)
     db = conn.wzmlx
     current_config = dict(dotenv_values("config.env"))
     old_config = db.settings.deployConfig.find_one({"_id": bot_id})
