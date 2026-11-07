@@ -22,6 +22,7 @@ This repository runs a Telegram mirror/leech bot as a long-running worker.
 ## Optional environment variables
 
 - `DATABASE_URL`: MongoDB connection URI. Recommended if you want the bot's settings/configuration stored in MongoDB; it is optional for startup.
+- `MAX_CONCURRENT_TRANSMISSIONS`: optional Telegram upload/download transmission concurrency; defaults to `4` to reduce memory spikes. Increase only on larger instances.
 - `AUTHORIZED_CHATS`, `SUDO_USERS`, `FSUB_IDS`, `LEECH_LOG_ID`, `MIRROR_LOG_ID`, `LINKS_LOG_ID`: set only when you need those features.
 - `BASE_URL`: leave empty for a worker-only deployment. If you enable web features, configure the corresponding Koyeb web service/port deliberately.
 
@@ -32,7 +33,9 @@ This repository runs a Telegram mirror/leech bot as a long-running worker.
 - Store credentials as Koyeb Secrets/environment variables. Do not commit tokens, API hashes, or MongoDB passwords to GitHub.
 - Koyeb container filesystems may be ephemeral. Do not assume downloaded files survive a redeploy/restart; use supported persistent storage or an external upload destination for files that must persist.
 - MongoDB persistence covers bot configuration/state handled by this code; it does not automatically persist the downloads directory.
-- This repository starts the Telegram bot, Aria2, and qBittorrent inside the container. Confirm the selected Koyeb instance has enough memory, CPU, and disk for the workload.
+- This repository starts the Telegram bot, Aria2, and qBittorrent inside the container. Defaults are tuned for a smaller worker: 16 Pyrogram workers, 4 concurrent Telegram transmissions, 3 active Aria2 downloads, and 3 active qBittorrent downloads.
+- For real mirror/leech workloads, use an instance with at least 2 GB RAM and sufficient disk; larger files, parallel uploads, media processing, and torrents can need substantially more. A tiny/free instance may restart or run out of memory.
+- qBittorrent and Aria2 download data is local to the container unless you configure persistent storage or external upload.
 
 ## Startup behavior
 
