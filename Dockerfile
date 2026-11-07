@@ -2,7 +2,8 @@ FROM mysterysd/wzmlx:latest
 
 WORKDIR /usr/src/app
 ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    KOYEB_DEPLOYMENT=true
 
 COPY requirements.txt ./
 RUN pip3 install --upgrade setuptools wheel \
