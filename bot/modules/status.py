@@ -90,6 +90,21 @@ async def status_pages(_, query):
         )
         await sleep(1.5)
         await update_all_messages(True)
+    elif data[1] == "taskref":
+        gid = data[2]
+        async with download_dict_lock:
+            active = any(dl.gid() == gid for dl in download_dict.values())
+        if not active:
+            return await query.answer("This task is no longer active.", show_alert=True)
+        bot_cache.setdefault("status_refresh", {})
+        refresh_status = bot_cache["status_refresh"]
+        if user_id in refresh_status and (curr := time() - refresh_status[user_id]) < 7:
+            return await query.answer(
+                f"Already Refreshed! Try after {get_readable_time(7 - curr)}",
+                show_alert=True,
+            )
+        refresh_status[user_id] = time()
+        await update_all_messages(True)
     elif data[1] in ["nex", "pre"]:
         await turn_page(data)
         await update_all_messages(True)
