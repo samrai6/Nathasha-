@@ -330,7 +330,7 @@ def get_readable_message():
         msg += BotTheme(
             "CANCEL", Cancel=f"/{BotCommands.CancelMirror}_{download.gid()}"
         )
-        buttons.ibutton("♻️ Refresh", f"status taskref {download.gid()}", "l_body")
+        # A single global Refresh button is added below the task list.
 
     if len(msg) == 0:
         return None, None
