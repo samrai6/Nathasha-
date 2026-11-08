@@ -263,6 +263,7 @@ def get_readable_message():
     if PAGE_NO > PAGES and PAGES != 0:
         globals()["STATUS_START"] = STATUS_LIMIT * (PAGES - 1)
         globals()["PAGE_NO"] = PAGES
+    buttons = ButtonMaker()
     for download in list(download_dict.values())[
         STATUS_START : STATUS_LIMIT + STATUS_START
     ]:
@@ -329,6 +330,7 @@ def get_readable_message():
         msg += BotTheme(
             "CANCEL", Cancel=f"/{BotCommands.CancelMirror}_{download.gid()}"
         )
+        buttons.ibutton("♻️ Refresh", f"status taskref {download.gid()}", "l_body")
 
     if len(msg) == 0:
         return None, None
@@ -366,7 +368,6 @@ def get_readable_message():
             up_speed += speed_in_bytes_per_second
 
     msg += BotTheme("FOOTER")
-    buttons = ButtonMaker()
     buttons.ibutton(BotTheme("REFRESH", Page=f"{PAGE_NO}/{PAGES}"), "status ref")
     if tasks > STATUS_LIMIT:
         if config_dict["BOT_MAX_TASKS"]:
@@ -378,7 +379,6 @@ def get_readable_message():
             )
         else:
             msg += BotTheme("TASKS", Tasks=tasks)
-        buttons = ButtonMaker()
         buttons.ibutton(BotTheme("PREVIOUS"), "status pre")
         buttons.ibutton(BotTheme("REFRESH", Page=f"{PAGE_NO}/{PAGES}"), "status ref")
         buttons.ibutton(BotTheme("NEXT"), "status nex")
