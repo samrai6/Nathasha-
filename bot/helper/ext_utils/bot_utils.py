@@ -380,7 +380,6 @@ def get_readable_message():
         else:
             msg += BotTheme("TASKS", Tasks=tasks)
         buttons.ibutton(BotTheme("PREVIOUS"), "status pre")
-        buttons.ibutton(BotTheme("REFRESH", Page=f"{PAGE_NO}/{PAGES}"), "status ref")
         buttons.ibutton(BotTheme("NEXT"), "status nex")
     button = buttons.build_menu(3)
     msg += BotTheme("Cpu", cpu=cpu_percent())
