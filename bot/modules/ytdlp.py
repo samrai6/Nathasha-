@@ -6,7 +6,8 @@ from aiohttp import ClientSession
 from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
 from functools import partial
-from time import time
+from time import time, sleep as blocking_sleep
+from os import path as ospath
 
 from bot import DOWNLOAD_DIR, bot, categories_dict, config_dict, user_data, LOGGER
 from bot.helper.ext_utils.task_manager import task_utils
@@ -195,11 +196,39 @@ class YtSelection:
 
 
 def extract_info(link, options):
-    with YoutubeDL(options) as ydl:
-        result = ydl.extract_info(link, download=False)
-        if result is None:
-            raise ValueError("Info result is None")
-        return result
+    last_error = None
+    for attempt in range(3):
+        try:
+            with YoutubeDL(options) as ydl:
+                result = ydl.extract_info(link, download=False)
+                if result is None:
+                    raise ValueError("Info result is None")
+                return result
+        except Exception as error:
+            last_error = error
+            error_text = str(error).lower()
+            if "requested format is not available" in error_text and "format" in options:
+                # Metadata is needed before the user can choose a quality.
+                # Retry without the configured selector; the selected quality
+                # is applied later by YoutubeDLHelper.
+                LOGGER.warning(
+                    "Configured yt-dlp format is unavailable during metadata "
+                    "extraction; retrying without a format restriction."
+                )
+                options.pop("format", None)
+                continue
+            if (
+                "video unavailable" in error_text
+                and "page needs to be reloaded" in error_text
+                and attempt < 2
+            ):
+                LOGGER.warning(
+                    "YouTube requested a page reload; retrying metadata extraction."
+                )
+                blocking_sleep(3)
+                continue
+            raise
+    raise last_error
 
 
 async def _mdisk(link, name):
@@ -499,7 +528,12 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     if "mdisk.me" in link:
         name, link = await _mdisk(link, name)
 
-    options = {"usenetrc": True, "cookiefile": "cookies.txt"}
+    options = {"usenetrc": True}
+    # Support both a root-level cookie file and Koyeb Secret Files.
+    for cookie_path in ("cookies.txt", "/etc/secrets/cookies.txt"):
+        if ospath.isfile(cookie_path):
+            options["cookiefile"] = cookie_path
+            break
     if opt:
         yt_opt = opt.split("|")
         for ytopt in yt_opt:
@@ -507,6 +541,7 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
             if key == "format":
                 if select:
                     qual = ""
+                    continue
                 elif value.startswith("ba/b-"):
                     qual = value
                     continue
