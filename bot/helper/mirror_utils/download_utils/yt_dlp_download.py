@@ -66,7 +66,6 @@ class YoutubeDLHelper:
             "progress_hooks": [self.__onDownloadProgress],
             "logger": MyLogger(self, self.__listener),
             "usenetrc": True,
-            "cookiefile": "cookies.txt",
             "allow_multiple_video_streams": True,
             "allow_multiple_audio_streams": True,
             "noprogress": True,
@@ -83,6 +82,12 @@ class YoutubeDLHelper:
                 "extractor": lambda n: 3,
             },
         }
+        # Support root-level cookies.txt and Koyeb Secret Files without
+        # requiring a cookie file when YouTube does not need authentication.
+        for cookie_path in ("cookies.txt", "/etc/secrets/cookies.txt"):
+            if ospath.isfile(cookie_path):
+                self.opts["cookiefile"] = cookie_path
+                break
 
     @property
     def download_speed(self):
@@ -154,20 +159,10 @@ class YoutubeDLHelper:
             except Exception as e:
                 error_text = str(e).lower()
                 if "requested format is not available" in error_text:
-                    LOGGER.warning(
-                        "Requested YouTube format is unavailable; retrying metadata "
-                        "with the best available video/audio format."
+                    return self.__onDownloadError(
+                        "Selected video format is not available for this YouTube video. "
+                        "Choose a lower quality or check the available formats."
                     )
-                    self.opts["format"] = "bestvideo*+bestaudio/best"
-                    try:
-                        # Create a fresh YoutubeDL instance so the updated format
-                        # selector is applied to the metadata retry.
-                        with YoutubeDL(self.opts) as fallback_ydl:
-                            result = fallback_ydl.extract_info(link, download=False)
-                        if result is None:
-                            raise ValueError("Info result is None")
-                    except Exception as retry_error:
-                        return self.__onDownloadError(str(retry_error))
                 elif "video unavailable" in error_text and "page needs to be reloaded" in error_text:
                     LOGGER.warning("YouTube requested a page reload; retrying metadata extraction.")
                     last_error = e
@@ -224,25 +219,18 @@ class YoutubeDLHelper:
                     error_text = str(e).lower()
                     if (
                         not self.__is_cancelled
-                        and "requested format is not available" in error_text
+                        and (
+                            "requested format is not available" in error_text
+                            or (
+                                "video unavailable" in error_text
+                                and "page needs to be reloaded" in error_text
+                            )
+                        )
                     ):
                         LOGGER.warning(
-                            "Requested YouTube format is unavailable; retrying "
-                            "download with the best available format."
+                            "YouTube extraction failed temporarily or the selected "
+                            "format was unavailable; retrying the same format."
                         )
-                        self.opts["format"] = "bestvideo*+bestaudio/best"
-                        try:
-                            with YoutubeDL(self.opts) as fallback_ydl:
-                                fallback_ydl.download([link])
-                        except DownloadError as retry_error:
-                            self.__onDownloadError(str(retry_error))
-                            return
-                    elif (
-                        not self.__is_cancelled
-                        and "video unavailable" in error_text
-                        and "page needs to be reloaded" in error_text
-                    ):
-                        LOGGER.warning("YouTube requested a page reload; retrying download.")
                         last_error = e
                         for attempt in range(3):
                             if self.__is_cancelled:
@@ -316,13 +304,13 @@ class YoutubeDLHelper:
         if options:
             self.__set_options(options)
 
-        # Add a final fallback so yt-dlp can choose an available format
-        # when a requested format is missing or changes between extraction
-        # and download (for example, on YouTube).
-        format_selector = self.opts.get("format")
-        if isinstance(format_selector, str) and format_selector.strip():
-            if "best" not in format_selector.split("/"):
-                self.opts["format"] = f"{format_selector}/best"
+        # Keep the selected MP4 container when yt-dlp merges separate streams.
+        if (
+            isinstance(qual, str)
+            and "bestvideo[" in qual
+            and "+bestaudio[" in qual
+        ):
+            self.opts["merge_output_format"] = "mp4"
 
         await sync_to_async(self.extractMetaData, link, name)
         if self.__is_cancelled:
@@ -436,7 +424,9 @@ class YoutubeDLHelper:
         options = options.split("|")
         for opt in options:
             key, value = map(str.strip, opt.split(":", 1))
-            if key == "format" and value.startswith("ba/b-"):
+            # The selected quality is passed separately as qual. Never let
+            # global/custom YT_DLP_OPTIONS overwrite the user's button choice.
+            if key == "format":
                 continue
             if value.startswith("^"):
                 if "." in value or value == "^inf":
