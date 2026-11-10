@@ -312,7 +312,16 @@ class YoutubeDLHelper:
         ):
             self.opts["merge_output_format"] = "mp4"
 
-        await sync_to_async(self.extractMetaData, link, name)
+        # Metadata extraction must not use the selected download format.
+        # Some videos do not expose the exact MP4 selector during metadata
+        # probing, even though yt-dlp can still enumerate the video normally.
+        # Keep the user's selected format for the actual download.
+        selected_format = self.opts.pop("format", None)
+        try:
+            await sync_to_async(self.extractMetaData, link, name)
+        finally:
+            if selected_format is not None:
+                self.opts["format"] = selected_format
         if self.__is_cancelled:
             return
 
