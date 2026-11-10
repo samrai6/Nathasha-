@@ -245,6 +245,14 @@ class YoutubeDLHelper:
         if options:
             self.__set_options(options)
 
+        # Add a final fallback so yt-dlp can choose an available format
+        # when a requested format is missing or changes between extraction
+        # and download (for example, on YouTube).
+        format_selector = self.opts.get("format")
+        if isinstance(format_selector, str) and format_selector.strip():
+            if "best" not in format_selector.split("/"):
+                self.opts["format"] = f"{format_selector}/best"
+
         await sync_to_async(self.extractMetaData, link, name)
         if self.__is_cancelled:
             return
