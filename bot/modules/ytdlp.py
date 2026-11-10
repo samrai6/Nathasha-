@@ -119,8 +119,8 @@ class YtSelection:
         # Fixed MP4 choices: each selector combines video with an audio stream.
         for height in [360, 480, 720, 1080]:
             video_format = (
-                f"bv*[height<=?{height}][ext=mp4]+ba[ext=m4a]"
-                f"/b[height<=?{height}][ext=mp4]"
+                f"bestvideo[height<=?{height}][ext=mp4]+bestaudio[ext=m4a]"
+                f"/best[height<=?{height}][ext=mp4]"
             )
             self.formats[f"{height}|mp4"] = video_format
             buttons.ibutton(f"{height}p MP4", f"ytq {height}|mp4")
@@ -129,9 +129,9 @@ class YtSelection:
         self.__main_buttons = buttons.build_menu(2)
         if "entries" in result:
             self.__is_playlist = True
-            msg = f"Choose Playlist Quality (Video + Audio):\\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
+            msg = f"Choose Playlist Quality (Video + Audio):\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
         else:
-            msg = f"Choose Video Quality (MP4 + Audio):\\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
+            msg = f"Choose Video Quality (MP4 + Audio):\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
         self.__reply_to = await sendMessage(self.__message, msg, self.__main_buttons)
         await wrap_future(future)
         if not self.is_cancelled:
