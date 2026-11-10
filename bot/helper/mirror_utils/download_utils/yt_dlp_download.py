@@ -160,7 +160,10 @@ class YoutubeDLHelper:
                     )
                     self.opts["format"] = "bestvideo*+bestaudio/best"
                     try:
-                        result = ydl.extract_info(link, download=False)
+                        # Create a fresh YoutubeDL instance so the updated format
+                        # selector is applied to the metadata retry.
+                        with YoutubeDL(self.opts) as fallback_ydl:
+                            result = fallback_ydl.extract_info(link, download=False)
                         if result is None:
                             raise ValueError("Info result is None")
                     except Exception as retry_error:
