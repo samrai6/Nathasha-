@@ -4,6 +4,7 @@ from secrets import token_hex
 from logging import getLogger
 from yt_dlp import YoutubeDL, DownloadError
 from re import search as re_search
+from time import sleep
 
 from bot import download_dict_lock, download_dict, non_queued_dl, queue_dict_lock
 from bot.helper.telegram_helper.message_utils import sendStatusMessage
@@ -151,7 +152,8 @@ class YoutubeDLHelper:
                 if result is None:
                     raise ValueError("Info result is None")
             except Exception as e:
-                if "requested format is not available" in str(e).lower():
+                error_text = str(e).lower()
+                if "requested format is not available" in error_text:
                     LOGGER.warning(
                         "Requested YouTube format is unavailable; retrying metadata "
                         "with the best available video/audio format."
@@ -163,6 +165,21 @@ class YoutubeDLHelper:
                             raise ValueError("Info result is None")
                     except Exception as retry_error:
                         return self.__onDownloadError(str(retry_error))
+                elif "video unavailable" in error_text and "page needs to be reloaded" in error_text:
+                    LOGGER.warning("YouTube requested a page reload; retrying metadata extraction.")
+                    last_error = e
+                    for attempt in range(3):
+                        sleep(3)
+                        try:
+                            with YoutubeDL(self.opts) as retry_ydl:
+                                result = retry_ydl.extract_info(link, download=False)
+                            if result is not None:
+                                break
+                            last_error = ValueError("Info result is None")
+                        except Exception as retry_error:
+                            last_error = retry_error
+                    else:
+                        return self.__onDownloadError(str(last_error))
                 else:
                     return self.__onDownloadError(str(e))
             if self.is_playlist:
@@ -201,9 +218,10 @@ class YoutubeDLHelper:
                 try:
                     ydl.download([link])
                 except DownloadError as e:
+                    error_text = str(e).lower()
                     if (
                         not self.__is_cancelled
-                        and "requested format is not available" in str(e).lower()
+                        and "requested format is not available" in error_text
                     ):
                         LOGGER.warning(
                             "Requested YouTube format is unavailable; retrying "
@@ -215,6 +233,27 @@ class YoutubeDLHelper:
                                 fallback_ydl.download([link])
                         except DownloadError as retry_error:
                             self.__onDownloadError(str(retry_error))
+                            return
+                    elif (
+                        not self.__is_cancelled
+                        and "video unavailable" in error_text
+                        and "page needs to be reloaded" in error_text
+                    ):
+                        LOGGER.warning("YouTube requested a page reload; retrying download.")
+                        last_error = e
+                        for attempt in range(3):
+                            if self.__is_cancelled:
+                                return
+                            sleep(3)
+                            try:
+                                with YoutubeDL(self.opts) as retry_ydl:
+                                    retry_ydl.download([link])
+                                last_error = None
+                                break
+                            except DownloadError as retry_error:
+                                last_error = retry_error
+                        if last_error is not None:
+                            self.__onDownloadError(str(last_error))
                             return
                     else:
                         if not self.__is_cancelled:
