@@ -116,14 +116,69 @@ class YtSelection:
     async def get_quality(self, result):
         future = self.__event_handler()
         buttons = ButtonMaker()
-        # Fixed MP4 choices: each selector combines video with an audio stream.
-        for height in [360, 480, 720, 1080]:
-            video_format = (
-                f"bestvideo[height<=?{height}][ext=mp4]+bestaudio[ext=m4a]"
-                f"/best[height<=?{height}][ext=mp4]"
+        # Build quality buttons from the exact formats returned by YouTube.
+        # For playlists, inspect the first available entry.
+        format_info = result
+        if "entries" in result:
+            self.__is_playlist = True
+            format_info = next(
+                (entry for entry in result.get("entries", []) if entry and entry.get("formats")),
+                {},
             )
-            self.formats[f"{height}|mp4"] = video_format
-            buttons.ibutton(f"{height}p MP4", f"ytq {height}|mp4")
+
+        available = format_info.get("formats", []) or []
+        video_formats = [
+            item for item in available
+            if item.get("height")
+            and item.get("vcodec") not in (None, "none")
+        ]
+        audio_formats = [
+            item for item in available
+            if item.get("acodec") not in (None, "none")
+            and item.get("vcodec") in (None, "none")
+        ]
+
+        def format_score(item):
+            return (
+                item.get("height") or 0,
+                item.get("tbr") or item.get("vbr") or 0,
+                1 if item.get("ext") == "mp4" else 0,
+            )
+
+        best_audio = max(
+            audio_formats,
+            key=lambda item: (
+                item.get("abr") or item.get("tbr") or 0,
+                1 if item.get("ext") == "m4a" else 0,
+            ),
+            default=None,
+        )
+
+        by_height = {}
+        for item in video_formats:
+            height = int(item["height"])
+            current = by_height.get(height)
+            if current is None or format_score(item) > format_score(current):
+                by_height[height] = item
+
+        for height in sorted(by_height, reverse=True):
+            video = by_height[height]
+            # Prefer a single YouTube format that already contains audio.
+            if video.get("acodec") not in (None, "none"):
+                selector = str(video["format_id"])
+            elif best_audio:
+                selector = f'{video["format_id"]}+{best_audio["format_id"]}'
+            else:
+                continue
+            key = f"{height}|available"
+            self.formats[key] = selector
+            ext_label = video.get("ext", "").upper()
+            buttons.ibutton(
+                f"{height}p ({ext_label})" if ext_label else f"{height}p",
+                f"ytq {key}",
+            )
+
+        # Keep audio-only download available.
         buttons.ibutton("Music (MP3)", "ytq mp3")
         buttons.ibutton("Cancel", "ytq cancel", "footer")
         self.__main_buttons = buttons.build_menu(2)
