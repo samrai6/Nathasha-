@@ -151,7 +151,20 @@ class YoutubeDLHelper:
                 if result is None:
                     raise ValueError("Info result is None")
             except Exception as e:
-                return self.__onDownloadError(str(e))
+                if "requested format is not available" in str(e).lower():
+                    LOGGER.warning(
+                        "Requested YouTube format is unavailable; retrying metadata "
+                        "with the best available video/audio format."
+                    )
+                    self.opts["format"] = "bestvideo*+bestaudio/best"
+                    try:
+                        result = ydl.extract_info(link, download=False)
+                        if result is None:
+                            raise ValueError("Info result is None")
+                    except Exception as retry_error:
+                        return self.__onDownloadError(str(retry_error))
+                else:
+                    return self.__onDownloadError(str(e))
             if self.is_playlist:
                 self.playlist_count = result.get("playlist_count", 0)
             if "entries" in result:
@@ -188,9 +201,25 @@ class YoutubeDLHelper:
                 try:
                     ydl.download([link])
                 except DownloadError as e:
-                    if not self.__is_cancelled:
-                        self.__onDownloadError(str(e))
-                    return
+                    if (
+                        not self.__is_cancelled
+                        and "requested format is not available" in str(e).lower()
+                    ):
+                        LOGGER.warning(
+                            "Requested YouTube format is unavailable; retrying "
+                            "download with the best available format."
+                        )
+                        self.opts["format"] = "bestvideo*+bestaudio/best"
+                        try:
+                            with YoutubeDL(self.opts) as fallback_ydl:
+                                fallback_ydl.download([link])
+                        except DownloadError as retry_error:
+                            self.__onDownloadError(str(retry_error))
+                            return
+                    else:
+                        if not self.__is_cancelled:
+                            self.__onDownloadError(str(e))
+                        return
             if self.is_playlist and (
                 not ospath.exists(path) or len(listdir(path)) == 0
             ):
