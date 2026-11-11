@@ -61,6 +61,11 @@ async def select_format(_, query, obj):
     elif data[1] == "aq":
         if data[2] == "back":
             await obj.audio_format()
+        elif data[2] == "cancel":
+            await editMessage(message, "Task has been cancelled.")
+            obj.qual = None
+            obj.is_cancelled = True
+            obj.event.set()
         else:
             await obj.audio_quality(data[2])
     elif data[1] == "back":
@@ -117,8 +122,7 @@ class YtSelection:
         future = self.__event_handler()
         buttons = ButtonMaker()
 
-        # WZML-X style: build selectors from the exact formats yt-dlp
-        # returned, grouped by resolution, FPS and container.
+        # Build the menu from formats actually returned by yt-dlp.
         format_info = result
         if "entries" in result:
             self.__is_playlist = True
@@ -131,98 +135,105 @@ class YtSelection:
             )
 
         format_list = format_info.get("formats") or []
+        video_formats = [
+            item for item in format_list
+            if item.get("height")
+            and item.get("vcodec") not in (None, "none")
+            and item.get("format_id")
+        ]
+        audio_formats = [
+            item for item in format_list
+            if item.get("format_id")
+            and (
+                item.get("vcodec") == "none"
+                or item.get("resolution") == "audio only"
+            )
+            and item.get("acodec") not in (None, "none")
+        ]
+
         if not self.__is_playlist:
-            for item in format_list:
-                if not item.get("tbr"):
-                    continue
+            for item in video_formats + audio_formats:
+                format_id = str(item["format_id"])
+                ext = item.get("ext") or item.get("video_ext") or item.get("audio_ext") or "unknown"
+                tbr = item.get("tbr")
+                bitrate_key = str(round(float(tbr))) if tbr else format_id
+                size = item.get("filesize") or item.get("filesize_approx") or 0
 
-                format_id = str(item.get("format_id", ""))
-                if not format_id:
-                    continue
-
-                if item.get("video_ext") == "none" and (
-                    item.get("resolution") == "audio only"
-                    or item.get("acodec") != "none"
-                ):
-                    if item.get("audio_ext") == "m4a" or item.get("ext") == "m4a":
-                        self.__is_m4a = True
-                    b_name = f"{item.get('acodec') or format_id}-{item.get('ext', '')}"
+                if item in audio_formats:
+                    b_name = f"{item.get('acodec')}-{ext}"
                     selector = format_id
-                elif item.get("height"):
+                    if ext == "m4a":
+                        self.__is_m4a = True
+                else:
                     height = int(item["height"])
-                    ext = item.get("ext") or item.get("video_ext") or "unknown"
                     fps = item.get("fps") or ""
                     b_name = f"{height}p{fps}-{ext}"
-                    ba_ext = "[ext=m4a]" if self.__is_m4a and ext == "mp4" else ""
-                    selector = f"{format_id}+ba{ba_ext}/b[height=?{height}]"
-                else:
-                    continue
+                    # Muxed formats already contain audio. Add an audio
+                    # stream only when the selected format is video-only.
+                    if item.get("acodec") not in (None, "none"):
+                        selector = format_id
+                    elif ext == "mp4":
+                        selector = f"{format_id}+ba[ext=m4a]/b[height<=?{height}]"
+                    else:
+                        selector = f"{format_id}+ba/b[height<=?{height}]"
 
-                size = item.get("filesize") or item.get("filesize_approx") or 0
-                self.formats.setdefault(b_name, {})[str(item["tbr"])] = [
-                    size,
-                    selector,
-                ]
+                entries = self.formats.setdefault(b_name, {})
+                if bitrate_key in entries:
+                    bitrate_key = f"{bitrate_key}_{format_id}"
+                entries[bitrate_key] = [size, selector]
 
             for b_name, tbr_dict in self.formats.items():
                 if len(tbr_dict) == 1:
-                    tbr, format_data = next(iter(tbr_dict.items()))
-                    button_name = (
-                        f"{b_name} ({get_readable_file_size(format_data[0])})"
-                    )
-                    buttons.ibutton(
-                        button_name, f"ytq sub {b_name} {tbr}"
-                    )
+                    key, format_data = next(iter(tbr_dict.items()))
+                    button_name = f"{b_name} ({get_readable_file_size(format_data[0])})"
+                    buttons.ibutton(button_name, f"ytq sub {b_name} {key}")
                 else:
                     buttons.ibutton(b_name, f"ytq dict {b_name}")
         else:
-            # Playlist format IDs can differ between entries, so use yt-dlp's
-            # height/container selectors rather than reusing one video's ID.
+            # Format IDs may differ between playlist entries; use selectors
+            # based on the formats exposed by the first available entry.
             heights = sorted(
-                {
-                    int(item["height"])
-                    for item in format_list
-                    if item.get("height")
-                    and item.get("vcodec") not in (None, "none")
-                },
+                {int(item["height"]) for item in video_formats},
                 reverse=True,
             )
             for height in heights:
                 mp4_video = any(
-                    int(item.get("height") or 0) == height
-                    and item.get("ext") == "mp4"
-                    and item.get("vcodec") not in (None, "none")
-                    for item in format_list
+                    int(item.get("height") or 0) == height and item.get("ext") == "mp4"
+                    for item in video_formats
                 )
                 webm_video = any(
-                    int(item.get("height") or 0) == height
-                    and item.get("ext") == "webm"
-                    and item.get("vcodec") not in (None, "none")
-                    for item in format_list
+                    int(item.get("height") or 0) == height and item.get("ext") == "webm"
+                    for item in video_formats
                 )
                 if mp4_video:
                     key = f"{height}|mp4"
                     self.formats[key] = (
                         f"bv*[height<=?{height}][ext=mp4]+ba[ext=m4a]/"
-                        f"b[height<=?{height}]"
+                        f"b[height<=?{height}][ext=mp4]"
                     )
                     buttons.ibutton(f"{height}p MP4", f"ytq {key}")
                 if webm_video:
                     key = f"{height}|webm"
                     self.formats[key] = (
                         f"bv*[height<=?{height}][ext=webm]+ba/"
-                        f"b[height<=?{height}]"
+                        f"b[height<=?{height}][ext=webm]"
                     )
                     buttons.ibutton(f"{height}p WEBM", f"ytq {key}")
 
-        buttons.ibutton("Music (MP3)", "ytq mp3")
-        buttons.ibutton("Audio Formats", "ytq audio")
-        buttons.ibutton(
-            "Best Video", "ytq bv*+ba/b"
-        )
-        buttons.ibutton("Best Audio", "ytq ba/b")
+        if audio_formats or video_formats:
+            buttons.ibutton("Music (MP3)", "ytq mp3")
+            buttons.ibutton("Audio Formats", "ytq audio")
+        if video_formats:
+            buttons.ibutton("Best Video", "ytq bv*+ba/b")
+        if audio_formats or video_formats:
+            buttons.ibutton("Best Audio", "ytq ba/b")
         buttons.ibutton("Cancel", "ytq cancel", "footer")
         self.__main_buttons = buttons.build_menu(2)
+
+        if not video_formats and not audio_formats:
+            self.is_cancelled = True
+            self.event.set()
+            return None
 
         if self.__is_playlist:
             msg = (
@@ -231,7 +242,7 @@ class YtSelection:
             )
         else:
             msg = (
-                "Choose Video Quality (available YouTube formats):\\n"
+                "Choose Video Quality (available formats):\\n"
                 f"Timeout: {get_readable_time(self.__timeout-(time()-self.__time))}"
             )
         self.__reply_to = await sendMessage(
@@ -253,7 +264,8 @@ class YtSelection:
         buttons = ButtonMaker()
         tbr_dict = self.formats[b_name]
         for tbr, d_data in tbr_dict.items():
-            button_name = f"{tbr}K ({get_readable_file_size(d_data[0])})"
+            label = f"{tbr}K" if tbr.isdigit() else f"Format {tbr}"
+            button_name = f"{label} ({get_readable_file_size(d_data[0])})"
             buttons.ibutton(button_name, f"ytq sub {b_name} {tbr}")
         buttons.ibutton("Back", "ytq back", "footer")
         buttons.ibutton("Cancel", "ytq cancel", "footer")
