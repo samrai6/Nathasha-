@@ -69,6 +69,9 @@ class YoutubeDLHelper:
             "allow_multiple_video_streams": True,
             "allow_multiple_audio_streams": True,
             "noprogress": True,
+            # Avoid Brotli responses on hosts where the decoder is unreliable.
+            "http_headers": {"Accept-Encoding": "gzip, deflate"},
+            "socket_timeout": 30,
             "allow_playlist_files": True,
             "overwrites": True,
             "writethumbnail": True,
