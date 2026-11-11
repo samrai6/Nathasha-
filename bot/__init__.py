@@ -237,7 +237,7 @@ if len(EXCEP_CHATS) == 0:
 
 def wztgClient(*args, **kwargs):
     if "max_concurrent_transmissions" in signature(tgClient.__init__).parameters:
-        kwargs["max_concurrent_transmissions"] = int(environ.get("MAX_CONCURRENT_TRANSMISSIONS", "4"))
+        kwargs["max_concurrent_transmissions"] = int(environ.get("MAX_CONCURRENT_TRANSMISSIONS", "1"))
     return tgClient(*args, **kwargs)
 
 
@@ -342,7 +342,7 @@ else:
     LEECH_SPLIT_SIZE = int(LEECH_SPLIT_SIZE)
 
 BOT_MAX_TASKS = environ.get("BOT_MAX_TASKS", "")
-BOT_MAX_TASKS = int(BOT_MAX_TASKS) if BOT_MAX_TASKS.isdigit() else ""
+BOT_MAX_TASKS = int(BOT_MAX_TASKS) if BOT_MAX_TASKS.isdigit() else 2
 
 STATUS_UPDATE_INTERVAL = environ.get("STATUS_UPDATE_INTERVAL", "")
 if len(STATUS_UPDATE_INTERVAL) == 0:
@@ -382,8 +382,8 @@ TORRENT_TIMEOUT = "" if len(TORRENT_TIMEOUT) == 0 else int(TORRENT_TIMEOUT)
 QUEUE_ALL = environ.get("QUEUE_ALL", "")
 QUEUE_ALL = "" if len(QUEUE_ALL) == 0 else int(QUEUE_ALL)
 
-QUEUE_DOWNLOAD = environ.get("QUEUE_DOWNLOAD", "")
-QUEUE_DOWNLOAD = "" if len(QUEUE_DOWNLOAD) == 0 else int(QUEUE_DOWNLOAD)
+QUEUE_DOWNLOAD = environ.get("QUEUE_DOWNLOAD", "1")
+QUEUE_DOWNLOAD = 1 if len(QUEUE_DOWNLOAD) == 0 else int(QUEUE_DOWNLOAD)
 
 QUEUE_UPLOAD = environ.get("QUEUE_UPLOAD", "")
 QUEUE_UPLOAD = "" if len(QUEUE_UPLOAD) == 0 else int(QUEUE_UPLOAD)
