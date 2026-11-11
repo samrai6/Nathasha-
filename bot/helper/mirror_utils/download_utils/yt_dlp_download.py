@@ -217,19 +217,20 @@ class YoutubeDLHelper:
                     ydl.download([link])
                 except DownloadError as e:
                     error_text = str(e).lower()
+                    if not self.__is_cancelled and "requested format is not available" in error_text:
+                        self.__onDownloadError(
+                            "Selected quality is not available for this video. "
+                            "Run the link again and choose one of the formats shown."
+                        )
+                        return
                     if (
                         not self.__is_cancelled
-                        and (
-                            "requested format is not available" in error_text
-                            or (
-                                "video unavailable" in error_text
-                                and "page needs to be reloaded" in error_text
-                            )
-                        )
+                        and "video unavailable" in error_text
+                        and "page needs to be reloaded" in error_text
                     ):
                         LOGGER.warning(
-                            "YouTube extraction failed temporarily or the selected "
-                            "format was unavailable; retrying the same format."
+                            "YouTube requested a page reload; retrying the selected "
+                            "format with a fresh YoutubeDL instance."
                         )
                         last_error = e
                         for attempt in range(3):
@@ -305,10 +306,9 @@ class YoutubeDLHelper:
             self.__set_options(options)
 
         # Keep the selected MP4 container when yt-dlp merges separate streams.
-        if (
-            isinstance(qual, str)
-            and "bestvideo[" in qual
-            and "+bestaudio[" in qual
+        if isinstance(qual, str) and (
+            "+ba[ext=m4a]" in qual
+            or ("[ext=mp4]" in qual and "+ba" in qual)
         ):
             self.opts["merge_output_format"] = "mp4"
 
