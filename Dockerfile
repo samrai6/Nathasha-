@@ -3,13 +3,20 @@ FROM mysterysd/wzmlx:latest
 WORKDIR /usr/src/app
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    KOYEB_DEPLOYMENT=true
+    KOYEB_DEPLOYMENT=true \
+    DENO_INSTALL=/root/.deno \
+    PATH=/root/.deno/bin:$PATH
 
 COPY requirements.txt ./
 # pymediainfo 6.0.1 (pulled in transitively) uses legacy setup.py metadata.
 # Its setuptools_scm build hook imports vcs_versioning, so install that
 # build-time dependency before resolving the full requirements list.
-RUN pip3 install --upgrade setuptools wheel \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://deno.land/install.sh | sh \
+    && deno --version \
+    && pip3 install --upgrade setuptools wheel \
     && pip3 install --no-cache-dir vcs-versioning \
     && pip3 install --no-cache-dir -r requirements.txt
 
