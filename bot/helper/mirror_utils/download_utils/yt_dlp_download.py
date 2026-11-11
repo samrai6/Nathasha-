@@ -219,7 +219,6 @@ class YoutubeDLHelper:
             with YoutubeDL(self.opts) as ydl:
                 try:
                     ydl.download([link])
-                gc.collect()
                 except DownloadError as e:
                     error_text = str(e).lower()
                     if not self.__is_cancelled and "requested format is not available" in error_text:
@@ -256,6 +255,7 @@ class YoutubeDLHelper:
                         if not self.__is_cancelled:
                             self.__onDownloadError(str(e))
                         return
+            gc.collect()
             if self.is_playlist and (
                 not ospath.exists(path) or len(listdir(path)) == 0
             ):
