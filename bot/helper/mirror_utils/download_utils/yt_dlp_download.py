@@ -5,6 +5,7 @@ from logging import getLogger
 from yt_dlp import YoutubeDL, DownloadError
 from re import search as re_search
 from time import sleep
+import gc
 
 from bot import download_dict_lock, download_dict, non_queued_dl, queue_dict_lock
 from bot.helper.telegram_helper.message_utils import sendStatusMessage
@@ -218,6 +219,7 @@ class YoutubeDLHelper:
             with YoutubeDL(self.opts) as ydl:
                 try:
                     ydl.download([link])
+                gc.collect()
                 except DownloadError as e:
                     error_text = str(e).lower()
                     if not self.__is_cancelled and "requested format is not available" in error_text:
