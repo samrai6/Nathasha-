@@ -312,6 +312,11 @@ class YtSelection:
 
 
 def extract_info(link, options):
+    # Do not advertise Brotli: some Koyeb/curl-cffi environments fail to
+    # decode YouTube's Brotli responses, which prevents format discovery.
+    headers = options.setdefault("http_headers", {})
+    headers["Accept-Encoding"] = "gzip, deflate"
+    options.setdefault("socket_timeout", 30)
     last_error = None
     for attempt in range(3):
         try:
