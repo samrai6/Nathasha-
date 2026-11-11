@@ -6,6 +6,7 @@ apscheduler
 aria2p
 asyncio
 beautifulsoup4
+brotli
 cinemagoer
 cloudscraper
 cryptography
@@ -43,4 +44,5 @@ uv
 uvloop==0.21.0
 xattr
 yt-dlp[default,curl-cffi]
+yt-dlp-ejs
 pytz
