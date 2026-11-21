@@ -656,6 +656,7 @@ bot.add_handler(
     MessageHandler(
         mirror,
         filters=command(BotCommands.MirrorCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -664,6 +665,7 @@ bot.add_handler(
     MessageHandler(
         qb_mirror,
         filters=command(BotCommands.QbMirrorCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
