@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler
-from pyrogram.filters import command
+from pyrogram.filters import command, create
 from secrets import token_hex
 from asyncio import sleep, gather
 from aiofiles.os import path as aiopath
@@ -423,6 +423,7 @@ bot.add_handler(
     MessageHandler(
         clone,
         filters=command(BotCommands.CloneCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
