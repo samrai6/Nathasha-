@@ -145,11 +145,12 @@ async def relay_source_post(client, message):
             if group_id in seen_media_groups:
                 return
             seen_media_groups.add(group_id)
-            copied = await client.copy_media_group(
-                chat_id=[int(x["id"]) for x in dumps],
-                from_chat_id=message.chat.id,
-                message_id=message.id,
-            )
+            for dump in dumps:
+                await client.copy_media_group(
+                    chat_id=int(dump["id"]),
+                    from_chat_id=message.chat.id,
+                    message_id=message.id,
+                )
             return
         for dump in dumps:
             await client.copy_message(
@@ -169,7 +170,7 @@ bot.add_handler(
     CallbackQueryHandler(fs_callback, filters=regex(r"^fs ") & filters.user(OWNER_ID))
 )
 bot.add_handler(
-    MessageHandler(fs_input, filters=filters.private & filters.user(OWNER_ID) & filters.text)
+    MessageHandler(fs_input, filters=filters.private & filters.user(OWNER_ID))
 )
 bot.add_handler(
     MessageHandler(
