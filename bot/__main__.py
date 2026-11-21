@@ -15,7 +15,7 @@ from aiofiles.os import path as aiopath, remove as aioremove
 from aiofiles import open as aiopen
 from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, private, photo, regex
+from pyrogram.filters import command, private, photo, regex, text as text_filter
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot import (
@@ -135,22 +135,45 @@ async def start(client, message):
     await DbManger().update_pm_users(message.from_user.id)
 
 
+pending_photo_links = {}
+
+
 async def photo_caption_reply(_, message):
-    caption = message.caption or ""
-    non_empty_lines = [line for line in caption.splitlines() if line.strip()]
+    caption_lines = [
+        line.strip()
+        for line in (message.caption or "").splitlines()
+        if line.strip()
+    ]
+    if not caption_lines:
+        return await message.reply_text("ಮೊದಲು Photo ಜೊತೆಗೆ Movie title ಕಳುಹಿಸಿ.")
 
-    # Keep a short title + URL caption together; otherwise keep only
-    # the first two original caption lines.
-    if len(non_empty_lines) <= 2:
-        reply_caption = "\n".join(non_empty_lines)
-    else:
-        reply_caption = "\n".join(caption.splitlines()[:2]).strip()
+    # Both supported caption models use the first non-empty line as the title.
+    title = caption_lines[0]
+    pending_photo_links[message.from_user.id] = {
+        "photo_id": message.photo.file_id,
+        "title": title,
+    }
+    await message.reply_text("2ನೇ ಸಾಲಿಗೆ ಸೇರಿಸಬೇಕಾದ Link ಕಳುಹಿಸಿ.")
 
-    await bot.send_photo(
-        chat_id=message.chat.id,
-        photo=message.photo.file_id,
-        caption=reply_caption or None,
-    )
+
+async def photo_link_reply(_, message):
+    pending = pending_photo_links.get(message.from_user.id)
+    if not pending:
+        return
+
+    link = (message.text or "").strip()
+    if not link.startswith(("https://", "http://", "t.me/")):
+        return await message.reply_text("ಸರಿಯಾದ Link ಕಳುಹಿಸಿ.")
+
+    reply_caption = f'{pending["title"]}\\n\\n{link}'
+    try:
+        await bot.send_photo(
+            chat_id=message.chat.id,
+            photo=pending["photo_id"],
+            caption=reply_caption,
+        )
+    finally:
+        pending_photo_links.pop(message.from_user.id, None)
 
 
 async def token_callback(_, query):
@@ -414,6 +437,7 @@ async def main():
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private))
+    bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
     bot.add_handler(
         MessageHandler(login, filters=command(BotCommands.LoginCommand) & private)
