@@ -33,7 +33,7 @@ def fs_menu_text():
     return (
         "<b>📂 Forward Settings</b>\n\n"
         f"<b>Source Channel:</b> {source_text}\n"
-        f"<b>Dump Channels:</b> {len(dumps)}\\n"
+        f"<b>Dump Channels:</b> {len(dumps)}\n"
         f"<b>Leech Features:</b> {'ON ✅' if config_dict.get('LEECH_ENABLED', True) else 'OFF ❌'}"
     )
 
