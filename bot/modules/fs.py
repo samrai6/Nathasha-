@@ -34,7 +34,7 @@ def fs_menu_text():
         "<b>📂 Forward Settings</b>\n\n"
         f"<b>Source Channel:</b> {source_text}\n"
         f"<b>Dump Channels:</b> {len(dumps)}\n"
-        f"<b>Leech Features:</b> {'ON ✅' if config_dict.get('LEECH_ENABLED', True) else 'OFF ❌'}"
+        f"<b>Mirror / Clone / Leech:</b> {'ON ✅' if config_dict.get('LEECH_ENABLED', True) else 'OFF ❌'}"
     )
 
 
@@ -45,7 +45,7 @@ def fs_menu():
     buttons.ibutton("📋 View Dump Channels", "fs view")
     buttons.ibutton("➖ Remove Dump Channel", "fs remove")
     state = "ON ✅" if config_dict.get("LEECH_ENABLED", True) else "OFF ❌"
-    buttons.ibutton(f"Leech Features: {state}", "fs leech_toggle")
+    buttons.ibutton(f"Mirror / Clone / Leech: {state}", "fs leech_toggle")
     return buttons.build_menu(2)
 
 
