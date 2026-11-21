@@ -15,10 +15,11 @@ from aiofiles.os import path as aiopath, remove as aioremove
 from aiofiles import open as aiopen
 from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, private, regex
+from pyrogram.filters import command, private, photo, regex
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot import (
+    OWNER_ID,
     bot,
     user,
     bot_name,
@@ -132,6 +133,24 @@ async def start(client, message):
     else:
         await sendMessage(message, BotTheme("ST_UNAUTH"), reply_markup, photo="IMAGES")
     await DbManger().update_pm_users(message.from_user.id)
+
+
+async def photo_caption_reply(_, message):
+    caption = message.caption or ""
+    non_empty_lines = [line for line in caption.splitlines() if line.strip()]
+
+    # Keep a short title + URL caption together; otherwise keep only
+    # the first two original caption lines.
+    if len(non_empty_lines) <= 2:
+        reply_caption = "\n".join(non_empty_lines)
+    else:
+        reply_caption = "\n".join(caption.splitlines()[:2]).strip()
+
+    await bot.send_photo(
+        chat_id=message.chat.id,
+        photo=message.photo.file_id,
+        caption=reply_caption or None,
+    )
 
 
 async def token_callback(_, query):
@@ -385,9 +404,16 @@ async def main():
     )
     await sync_to_async(start_aria2_listener, wait=False)
 
+    try:
+        await bot.send_message(OWNER_ID, "I'm alive sir 🤓")
+    except Exception as e:
+        LOGGER.error(f"Failed to send startup notification to owner: {e}")
+
+
     bot.add_handler(
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
+    bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private))
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
     bot.add_handler(
         MessageHandler(login, filters=command(BotCommands.LoginCommand) & private)
