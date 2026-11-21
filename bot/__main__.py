@@ -165,7 +165,7 @@ async def photo_link_reply(_, message):
     if not link.startswith(("https://", "http://", "t.me/")):
         return await message.reply_text("ಸರಿಯಾದ Link ಕಳುಹಿಸಿ.")
 
-    reply_caption = f'{pending["title"]}\\n\\n{link}'
+    reply_caption = f'{pending["title"]}\n\n{link}'
     try:
         await bot.send_photo(
             chat_id=message.chat.id,
