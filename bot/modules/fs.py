@@ -2,8 +2,8 @@
 from pyrogram import filters
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, create
-from pyrogram.enums import ChatType
-from bot import bot, bot_name, config_dict, OWNER_ID, LOGGER
+from pyrogram.enums import ChatType, ChatMemberStatus
+from bot import bot, config_dict, OWNER_ID, LOGGER, DATABASE_URL
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import sendMessage, editMessage
@@ -16,6 +16,8 @@ seen_media_groups = set()
 
 
 async def save_fs_settings():
+    if not DATABASE_URL:
+        return
     await DbManger().update_config({
         "FS_SOURCE_CHANNEL": config_dict.get("FS_SOURCE_CHANNEL"),
         "FS_DUMP_CHANNELS": config_dict.get("FS_DUMP_CHANNELS", []),
@@ -117,6 +119,9 @@ async def fs_input(_, message):
             chat = await bot.get_chat(int(value) if value.lstrip("-").isdigit() else value)
         if chat.type != ChatType.CHANNEL:
             raise ValueError("Please send a channel, not a group or user.")
+        member = await bot.get_chat_member(chat.id, bot.me.id)
+        if member.status not in (ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR):
+            raise ValueError("Please make the bot an admin in this channel first.")
         item = {"id": int(chat.id), "title": chat.title or str(chat.id)}
         if action == "source":
             config_dict["FS_SOURCE_CHANNEL"] = item
