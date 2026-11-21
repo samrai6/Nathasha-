@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, regex, user
+from pyrogram.filters import command, regex, user, create
 from asyncio import sleep, wait_for, Event, wrap_future
 from aiohttp import ClientSession
 from aiofiles.os import path as aiopath
@@ -726,6 +726,7 @@ bot.add_handler(
     MessageHandler(
         ytdlleech,
         filters=command(BotCommands.YtdlLeechCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
