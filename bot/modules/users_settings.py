@@ -75,7 +75,7 @@ desp_dict = {
     ],
     "ldump": [
         "Leech Files User Dump for Personal Use as a Storage.",
-        "Send Leech Dump Channel ID\n➲ <b>Format:</b> \ntitle chat_id/@username\ntitle2 chat_id2/@username2. \n\n<b>NOTE:</b>Make Bot Admin in the Channel else it will not accept\n<b>Timeout:</b> 60 sec",
+        "Forward messages from all the dump channels here in one batch. The bot will collect each forwarded channel and add it to your dump list.\n\n<b>NOTE:</b> Make the bot Admin in every channel.\n<b>Timeout:</b> 60 sec",
     ],
     "mprefix": [
         "Mirror Filename Prefix is the Front Part attacted with the Filename of the Mirrored/Cloned Files.",
@@ -851,6 +851,35 @@ async def set_custom(client, message, pre_event, key, direct=False):
         await DbManger().update_user_data(user_id)
 
 
+async def set_dump_from_forward(client, message, pre_event):
+    user_id = message.from_user.id
+    forwarded_chat = message.forward_from_chat
+    if not forwarded_chat:
+        LOGGER.warning(
+            f"[DUMP-SET] Forwarded message has no visible source | user={user_id}"
+        )
+        return
+
+    title = forwarded_chat.title or forwarded_chat.username or str(forwarded_chat.id)
+    ldumps = dict(user_data.get(user_id, {}).get("ldump", {}))
+    existing_title = next(
+        (name for name in ldumps if name.casefold() == title.casefold()), None
+    )
+    if existing_title:
+        ldumps[existing_title] = forwarded_chat.id
+        title = existing_title
+    else:
+        ldumps[title] = forwarded_chat.id
+
+    update_user_ldata(user_id, "ldump", ldumps)
+    if DATABASE_URL:
+        await DbManger().update_user_data(user_id)
+    LOGGER.info(
+        f"[DUMP-SET] Added/updated forwarded channel | user={user_id} | "
+        f"title={title!r} | chat_id={forwarded_chat.id} | total={len(ldumps)}"
+    )
+
+
 async def set_thumb(client, message, pre_event, key, direct=False):
     user_id = message.from_user.id
     handler_dict[user_id] = False
@@ -901,7 +930,9 @@ async def leech_split_size(client, message, pre_event):
         await DbManger().update_user_data(user_id)
 
 
-async def event_handler(client, query, pfunc, rfunc, photo=False, document=False):
+async def event_handler(
+    client, query, pfunc, rfunc, photo=False, document=False, forwarded=False
+):
     user_id = query.from_user.id
     handler_dict[user_id] = True
     start_time = time()
@@ -911,11 +942,16 @@ async def event_handler(client, query, pfunc, rfunc, photo=False, document=False
             mtype = event.photo
         elif document:
             mtype = event.document
+        elif forwarded:
+            mtype = event.forward_from_chat
         else:
             mtype = event.text
         user = event.from_user or event.sender_chat
         return bool(
-            user.id == user_id and event.chat.id == query.message.chat.id and mtype
+            user
+            and user.id == user_id
+            and event.chat.id == query.message.chat.id
+            and mtype
         )
 
     handler = client.add_handler(
@@ -1185,12 +1221,18 @@ async def edit_user_settings(client, query):
             "mirror" if data[2] in ["ddl_servers", "user_tds"] else "ddl_servers",
         )
         await event_handler(client, query, pfunc, rfunc)
+    elif data[2] == "ldump":
+        handler_dict[user_id] = False
+        await query.answer()
+        await update_user_settings(query, "ldump", "leech", True)
+        pfunc = partial(set_dump_from_forward, pre_event=query)
+        rfunc = partial(update_user_settings, query, "ldump", "leech")
+        await event_handler(client, query, pfunc, rfunc, forwarded=True)
     elif data[2] in [
         "lprefix",
         "lsuffix",
         "lremname",
         "lcaption",
-        "ldump",
         "mprefix",
         "msuffix",
         "mremname",
