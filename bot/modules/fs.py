@@ -11,6 +11,7 @@ from bot.helper.ext_utils.db_handler import DbManger
 
 config_dict.setdefault("FS_SOURCE_CHANNEL", None)
 config_dict.setdefault("FS_DUMP_CHANNELS", [])
+config_dict.setdefault("LEECH_ENABLED", True)
 pending_input = {}
 seen_media_groups = set()
 
@@ -21,6 +22,7 @@ async def save_fs_settings():
     await DbManger().update_config({
         "FS_SOURCE_CHANNEL": config_dict.get("FS_SOURCE_CHANNEL"),
         "FS_DUMP_CHANNELS": config_dict.get("FS_DUMP_CHANNELS", []),
+        "LEECH_ENABLED": config_dict.get("LEECH_ENABLED", True),
     })
 
 
@@ -31,7 +33,8 @@ def fs_menu_text():
     return (
         "<b>📂 Forward Settings</b>\n\n"
         f"<b>Source Channel:</b> {source_text}\n"
-        f"<b>Dump Channels:</b> {len(dumps)}"
+        f"<b>Dump Channels:</b> {len(dumps)}\\n"
+        f"<b>Leech Features:</b> {'ON ✅' if config_dict.get('LEECH_ENABLED', True) else 'OFF ❌'}"
     )
 
 
@@ -41,6 +44,8 @@ def fs_menu():
     buttons.ibutton("➕ Add Dump Channel", "fs add")
     buttons.ibutton("📋 View Dump Channels", "fs view")
     buttons.ibutton("➖ Remove Dump Channel", "fs remove")
+    state = "ON ✅" if config_dict.get("LEECH_ENABLED", True) else "OFF ❌"
+    buttons.ibutton(f"Leech Features: {state}", "fs leech_toggle")
     return buttons.build_menu(2)
 
 
@@ -65,6 +70,10 @@ async def fs_callback(_, query):
     action = data[1]
     if action in ("source", "add"):
         await ask_channel(query, action)
+    elif action == "leech_toggle":
+        config_dict["LEECH_ENABLED"] = not config_dict.get("LEECH_ENABLED", True)
+        await save_fs_settings()
+        await editMessage(query.message, fs_menu_text(), fs_menu())
     elif action == "view":
         dumps = config_dict.get("FS_DUMP_CHANNELS", [])
         if not dumps:
