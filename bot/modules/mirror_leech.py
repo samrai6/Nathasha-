@@ -1,5 +1,5 @@
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, regex
+from pyrogram.filters import command, regex, create
 from html import escape
 from traceback import format_exc
 from base64 import b64encode
@@ -672,6 +672,7 @@ bot.add_handler(
     MessageHandler(
         leech,
         filters=command(BotCommands.LeechCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -680,6 +681,7 @@ bot.add_handler(
     MessageHandler(
         qb_leech,
         filters=command(BotCommands.QbLeechCommand)
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
