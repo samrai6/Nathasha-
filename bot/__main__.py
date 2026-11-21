@@ -437,7 +437,7 @@ async def main():
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private))
-    bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private))
+    bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private), group=1)
     bot.add_handler(CallbackQueryHandler(token_callback, filters=regex(r"^pass")))
     bot.add_handler(
         MessageHandler(login, filters=command(BotCommands.LoginCommand) & private)
