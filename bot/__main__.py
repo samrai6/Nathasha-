@@ -139,41 +139,70 @@ pending_photo_links = {}
 
 
 async def photo_caption_reply(_, message):
-    caption_lines = [
-        line.strip()
-        for line in (message.caption or "").splitlines()
-        if line.strip()
-    ]
-    if not caption_lines:
-        return await message.reply_text("ಮೊದಲು Photo ಜೊತೆಗೆ Movie title ಕಳುಹಿಸಿ.")
+    user_id = message.from_user.id if message.from_user else "unknown"
+    try:
+        caption_lines = [
+            line.strip()
+            for line in (message.caption or "").splitlines()
+            if line.strip()
+        ]
+        LOGGER.info(
+            f"[PHOTO-CAPTION] Photo received | user={user_id} | "
+            f"has_caption={bool(message.caption)} | caption_lines={len(caption_lines)}"
+        )
+        if not caption_lines:
+            LOGGER.warning(
+                f"[PHOTO-CAPTION] No caption/title found | user={user_id}"
+            )
+            return await message.reply_text("ಮೊದಲು Photo ಜೊತೆಗೆ Movie title ಕಳುಹಿಸಿ.")
 
-    # Both supported caption models use the first non-empty line as the title.
-    title = caption_lines[0]
-    pending_photo_links[message.from_user.id] = {
-        "photo_id": message.photo.file_id,
-        "title": title,
-    }
-    await message.reply_text("2ನೇ ಸಾಲಿಗೆ ಸೇರಿಸಬೇಕಾದ Link ಕಳುಹಿಸಿ.")
+        title = caption_lines[0]
+        pending_photo_links[user_id] = {
+            "photo_id": message.photo.file_id,
+            "title": title,
+        }
+        LOGGER.info(
+            f"[PHOTO-CAPTION] Title saved; waiting for link | user={user_id} | title={title!r}"
+        )
+        await message.reply_text("2ನೇ ಸಾಲಿಗೆ ಸೇರಿಸಬೇಕಾದ Link ಕಳುಹಿಸಿ.")
+    except Exception:
+        LOGGER.exception(f"[PHOTO-CAPTION] Handler failed | user={user_id}")
+        raise
 
 
 async def photo_link_reply(_, message):
-    pending = pending_photo_links.get(message.from_user.id)
+    user_id = message.from_user.id if message.from_user else "unknown"
+    pending = pending_photo_links.get(user_id)
     if not pending:
         return
 
-    link = (message.text or "").strip()
-    if not link.startswith(("https://", "http://", "t.me/")):
-        return await message.reply_text("ಸರಿಯಾದ Link ಕಳುಹಿಸಿ.")
-
-    reply_caption = f'{pending["title"]}\n\n{link}'
     try:
+        link = (message.text or "").strip()
+        LOGGER.info(
+            f"[PHOTO-CAPTION] Link message received | user={user_id} | "
+            f"has_text={bool(link)}"
+        )
+        if not link.startswith(("https://", "http://", "t.me/")):
+            LOGGER.warning(
+                f"[PHOTO-CAPTION] Invalid link format | user={user_id}"
+            )
+            return await message.reply_text("ಸರಿಯಾದ Link ಕಳುಹಿಸಿ.")
+
+        reply_caption = f'{pending["title"]}\n\n{link}'
         await bot.send_photo(
             chat_id=message.chat.id,
             photo=pending["photo_id"],
             caption=reply_caption,
         )
+        LOGGER.info(
+            f"[PHOTO-CAPTION] Photo sent successfully | user={user_id} | "
+            f"title={pending['title']!r}"
+        )
+    except Exception:
+        LOGGER.exception(f"[PHOTO-CAPTION] Failed to send photo/caption | user={user_id}")
+        raise
     finally:
-        pending_photo_links.pop(message.from_user.id, None)
+        pending_photo_links.pop(user_id, None)
 
 
 async def token_callback(_, query):
