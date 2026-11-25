@@ -129,15 +129,28 @@ async def random_group_reaction(_, message):
         return
     if message.from_user and message.from_user.is_bot:
         return
+
     emoji = choice(REACTIONS)
     try:
-        await bot.send_reaction(
-            chat_id=message.chat.id,
-            message_id=message.id,
-            emoji=emoji,
+        await message.react(emoji, big=True)
+        LOGGER.info(
+            f"[REACTION] Reacted with {emoji} | chat={message.chat.id} | message={message.id}"
         )
     except Exception as e:
-        LOGGER.debug(f"Could not react in chat {message.chat.id}: {e}")
+        LOGGER.warning(
+            f"[REACTION] Failed with {emoji} | chat={message.chat.id} | "
+            f"message={message.id} | error={e}"
+        )
+        try:
+            await message.react("⚡️", big=True)
+            LOGGER.info(
+                f"[REACTION] Fallback ⚡️ succeeded | chat={message.chat.id} | message={message.id}"
+            )
+        except Exception as fallback_error:
+            LOGGER.error(
+                f"[REACTION] Fallback failed | chat={message.chat.id} | "
+                f"message={message.id} | error={fallback_error}"
+            )
 
 
 async def stats(client, message):
