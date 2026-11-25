@@ -4,6 +4,7 @@ from sys import executable
 from os import execl as osexecl
 from asyncio import Event, create_subprocess_exec, gather, run as asyrun
 from uuid import uuid4
+from random import choice
 from base64 import b64decode
 from importlib import import_module, reload
 
@@ -15,7 +16,7 @@ from aiofiles.os import path as aiopath, remove as aioremove
 from aiofiles import open as aiopen
 from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, private, photo, regex, text as text_filter
+from pyrogram.filters import command, private, photo, regex, text as text_filter, group, channel
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot import (
@@ -88,6 +89,55 @@ from .modules import (
     category_select,
     fs,
 )
+
+
+
+
+REACTIONS = [
+    "🤝",
+    "🦚",
+    "🦋",
+    "😇",
+    "🤗",
+    "😍",
+    "👍",
+    "🎅",
+    "🥰",
+    "🤩",
+    "😱",
+    "🤣",
+    "😘",
+    "👏",
+    "😛",
+    "😈",
+    "🎉",
+    "⚡️",
+    "🫡",
+    "🤓",
+    "😎",
+    "🏆",
+    "🔥",
+    "🤭",
+    "🆒",
+    "👻",
+    "😁"
+]
+
+
+async def random_group_reaction(_, message):
+    if not message or not message.chat or message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
+        return
+    if message.from_user and message.from_user.is_bot:
+        return
+    emoji = choice(REACTIONS)
+    try:
+        await bot.send_reaction(
+            chat_id=message.chat.id,
+            message_id=message.id,
+            reaction=[emoji],
+        )
+    except Exception as e:
+        LOGGER.debug(f"Could not react in chat {message.chat.id}: {e}")
 
 
 async def stats(client, message):
@@ -464,6 +514,9 @@ async def main():
 
     bot.add_handler(
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
+    )
+    bot.add_handler(
+        MessageHandler(random_group_reaction, filters=group | channel), group=2
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private), group=1)
     bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private), group=1)
