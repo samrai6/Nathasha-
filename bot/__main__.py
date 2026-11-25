@@ -125,7 +125,7 @@ REACTIONS = [
 
 
 async def random_group_reaction(_, message):
-    if not message or not message.chat or message.chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL):
+    if not message or not message.chat or message.chat.type not in (ChatType.PRIVATE, ChatType.CHANNEL):
         return
     if message.from_user and message.from_user.is_bot:
         return
@@ -516,7 +516,7 @@ async def main():
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
     bot.add_handler(
-        MessageHandler(random_group_reaction, filters=group | channel), group=2
+        MessageHandler(random_group_reaction, filters=private | channel), group=2
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private), group=1)
     bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private), group=1)
