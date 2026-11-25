@@ -656,7 +656,7 @@ bot.add_handler(
     MessageHandler(
         mirror,
         filters=command(BotCommands.MirrorCommand)
-        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", False))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -665,7 +665,7 @@ bot.add_handler(
     MessageHandler(
         qb_mirror,
         filters=command(BotCommands.QbMirrorCommand)
-        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", False))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -674,7 +674,7 @@ bot.add_handler(
     MessageHandler(
         leech,
         filters=command(BotCommands.LeechCommand)
-        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", False))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
@@ -683,7 +683,7 @@ bot.add_handler(
     MessageHandler(
         qb_leech,
         filters=command(BotCommands.QbLeechCommand)
-        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", True))
+        & create(lambda _, __, message: config_dict.get("LEECH_ENABLED", False))
         & CustomFilters.authorized
         & ~CustomFilters.blacklisted,
     )
