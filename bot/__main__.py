@@ -16,7 +16,7 @@ from aiofiles.os import path as aiopath, remove as aioremove
 from aiofiles import open as aiopen
 from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-from pyrogram.filters import command, private, photo, regex, text as text_filter, group, channel
+from pyrogram.filters import command, private, photo, regex, text as text_filter, group, channel, incoming
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot import (
