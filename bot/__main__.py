@@ -516,7 +516,7 @@ async def main():
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
     bot.add_handler(
-        MessageHandler(random_group_reaction, filters=private | channel), group=2
+        MessageHandler(random_group_reaction, filters=(private | channel) & incoming), group=2
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private), group=1)
     bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private), group=1)
