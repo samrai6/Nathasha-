@@ -134,7 +134,7 @@ async def random_group_reaction(_, message):
         await bot.send_reaction(
             chat_id=message.chat.id,
             message_id=message.id,
-            reaction=[emoji],
+            emoji=emoji,
         )
     except Exception as e:
         LOGGER.debug(f"Could not react in chat {message.chat.id}: {e}")
