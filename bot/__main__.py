@@ -124,31 +124,56 @@ REACTIONS = [
 ]
 
 
-async def random_group_reaction(_, message):
-    if not message or not message.chat or message.chat.type not in (ChatType.PRIVATE, ChatType.CHANNEL):
+async def random_private_reaction(client, message):
+    # Match Naruto09: react to every incoming private message from users.
+    if not message or not message.from_user:
         return
-    if message.from_user and message.from_user.is_bot:
-        return
-
-    emoji = choice(REACTIONS)
     try:
-        await message.react(emoji, big=True)
+        emoji = choice(REACTIONS)
+        await message.react(emoji=emoji, big=True)
         LOGGER.info(
-            f"[REACTION] Reacted with {emoji} | chat={message.chat.id} | message={message.id}"
+            f"[REACTION] PM reacted with {emoji} | user={message.from_user.id} | message={message.id}"
         )
     except Exception as e:
         LOGGER.warning(
-            f"[REACTION] Failed with {emoji} | chat={message.chat.id} | "
+            f"[REACTION] PM reaction failed | user={message.from_user.id} | "
             f"message={message.id} | error={e}"
         )
         try:
-            await message.react("⚡️", big=True)
+            await message.react(emoji="⚡️")
             LOGGER.info(
-                f"[REACTION] Fallback ⚡️ succeeded | chat={message.chat.id} | message={message.id}"
+                f"[REACTION] PM fallback ⚡️ succeeded | user={message.from_user.id} | message={message.id}"
             )
         except Exception as fallback_error:
             LOGGER.error(
-                f"[REACTION] Fallback failed | chat={message.chat.id} | "
+                f"[REACTION] PM fallback failed | user={message.from_user.id} | "
+                f"message={message.id} | error={fallback_error}"
+            )
+
+
+async def random_channel_reaction(client, message):
+    # Match Naruto09: react to every incoming post in channels.
+    if not message or not message.chat:
+        return
+    try:
+        emoji = choice(REACTIONS)
+        await message.react(emoji=emoji, big=True)
+        LOGGER.info(
+            f"[REACTION] Channel reacted with {emoji} | chat={message.chat.id} | message={message.id}"
+        )
+    except Exception as e:
+        LOGGER.warning(
+            f"[REACTION] Channel reaction failed | chat={message.chat.id} | "
+            f"message={message.id} | error={e}"
+        )
+        try:
+            await message.react(emoji="⚡️")
+            LOGGER.info(
+                f"[REACTION] Channel fallback ⚡️ succeeded | chat={message.chat.id} | message={message.id}"
+            )
+        except Exception as fallback_error:
+            LOGGER.error(
+                f"[REACTION] Channel fallback failed | chat={message.chat.id} | "
                 f"message={message.id} | error={fallback_error}"
             )
 
@@ -528,8 +553,12 @@ async def main():
     bot.add_handler(
         MessageHandler(start, filters=command(BotCommands.StartCommand) & private)
     )
+    # Keep PM and channel reactions separate, exactly like Naruto09.
     bot.add_handler(
-        MessageHandler(random_group_reaction, filters=(private | channel) & incoming), group=2
+        MessageHandler(random_private_reaction, filters=private & incoming), group=2
+    )
+    bot.add_handler(
+        MessageHandler(random_channel_reaction, filters=channel & incoming), group=2
     )
     bot.add_handler(MessageHandler(photo_caption_reply, filters=photo & private), group=1)
     bot.add_handler(MessageHandler(photo_link_reply, filters=text_filter & private), group=1)
