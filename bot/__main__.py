@@ -9,6 +9,7 @@ from base64 import b64decode
 from importlib import import_module, reload
 
 from requests import get as rget
+import aiohttp
 from pytz import timezone
 from bs4 import BeautifulSoup
 from signal import signal, SIGINT
@@ -124,59 +125,70 @@ REACTIONS = [
 ]
 
 
-async def random_private_reaction(client, message):
-    # Match Naruto09: react to every incoming private message from users.
-    if not message or not message.from_user:
+async def set_bot_api_reaction(message, emoji):
+    """Set a reaction through Telegram Bot API (Pyrogram MTProto reactions are not supported for bot accounts)."""
+    token = config_dict.get("BOT_TOKEN")
+    if not token:
+        raise RuntimeError("BOT_TOKEN is missing")
+
+    url = f"https://api.telegram.org/bot{token}/setMessageReaction"
+    payload = {
+        "chat_id": message.chat.id,
+        "message_id": message.id,
+        "reaction": [{"type": "emoji", "emoji": emoji}],
+        "is_big": True,
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=15)) as response:
+            result = await response.json(content_type=None)
+
+    if not result.get("ok"):
+        raise RuntimeError(result.get("description", f"Telegram Bot API error: {result}"))
+    return True
+
+
+async def _apply_random_reaction(message, chat_label):
+    if not message or not message.chat:
         return
+
+    emoji = choice(REACTIONS)
     try:
-        emoji = choice(REACTIONS)
-        await message.react(emoji=emoji, big=True)
+        await set_bot_api_reaction(message, emoji)
         LOGGER.info(
-            f"[REACTION] PM reacted with {emoji} | user={message.from_user.id} | message={message.id}"
+            f"[REACTION] {chat_label} reacted with {emoji} | "
+            f"chat={message.chat.id} | message={message.id}"
         )
-    except Exception as e:
+    except Exception as error:
         LOGGER.warning(
-            f"[REACTION] PM reaction failed | user={message.from_user.id} | "
-            f"message={message.id} | error={e}"
+            f"[REACTION] {chat_label} reaction {emoji} failed | "
+            f"chat={message.chat.id} | message={message.id} | error={error}"
         )
+        if emoji == "👍":
+            return
         try:
-            await message.react(emoji="⚡️")
+            await set_bot_api_reaction(message, "👍")
             LOGGER.info(
-                f"[REACTION] PM fallback ⚡️ succeeded | user={message.from_user.id} | message={message.id}"
+                f"[REACTION] {chat_label} fallback 👍 succeeded | "
+                f"chat={message.chat.id} | message={message.id}"
             )
         except Exception as fallback_error:
             LOGGER.error(
-                f"[REACTION] PM fallback failed | user={message.from_user.id} | "
-                f"message={message.id} | error={fallback_error}"
+                f"[REACTION] {chat_label} fallback failed | "
+                f"chat={message.chat.id} | message={message.id} | error={fallback_error}"
             )
+
+
+async def random_private_reaction(client, message):
+    # React to every incoming private message from users.
+    if not message or not message.from_user:
+        return
+    await _apply_random_reaction(message, "PM")
 
 
 async def random_channel_reaction(client, message):
-    # Match Naruto09: react to every incoming post in channels.
-    if not message or not message.chat:
-        return
-    try:
-        emoji = choice(REACTIONS)
-        await message.react(emoji=emoji, big=True)
-        LOGGER.info(
-            f"[REACTION] Channel reacted with {emoji} | chat={message.chat.id} | message={message.id}"
-        )
-    except Exception as e:
-        LOGGER.warning(
-            f"[REACTION] Channel reaction failed | chat={message.chat.id} | "
-            f"message={message.id} | error={e}"
-        )
-        try:
-            await message.react(emoji="⚡️")
-            LOGGER.info(
-                f"[REACTION] Channel fallback ⚡️ succeeded | chat={message.chat.id} | message={message.id}"
-            )
-        except Exception as fallback_error:
-            LOGGER.error(
-                f"[REACTION] Channel fallback failed | chat={message.chat.id} | "
-                f"message={message.id} | error={fallback_error}"
-            )
-
+    # React to every incoming post in channels where the bot can react.
+    await _apply_random_reaction(message, "Channel")
 
 async def stats(client, message):
     msg, btns = await get_stats(message)
