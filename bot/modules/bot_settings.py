@@ -455,6 +455,8 @@ async def load_config():
     if len(MIRROR_LOG_ID) == 0:
         MIRROR_LOG_ID = ""
 
+    LEECH_ENABLED = environ.get("LEECH_ENABLED", "False").lower() == "true"
+
     LEECH_LOG_ID = environ.get("LEECH_LOG_ID", "")
     if len(LEECH_LOG_ID) == 0:
         LEECH_LOG_ID = ""
@@ -694,6 +696,7 @@ async def load_config():
             "CLONE_LIMIT": CLONE_LIMIT,
             "MEGA_LIMIT": MEGA_LIMIT,
             "LEECH_LIMIT": LEECH_LIMIT,
+            "LEECH_ENABLED": LEECH_ENABLED,
             "FSUB_IDS": FSUB_IDS,
             "USER_MAX_TASKS": USER_MAX_TASKS,
             "USER_TIME_INTERVAL": USER_TIME_INTERVAL,
